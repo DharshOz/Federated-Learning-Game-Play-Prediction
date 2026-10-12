@@ -1,0 +1,1285 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Arcane Clash — Federated Learning & Playstyle Observatory</title>
+  <!-- Google Fonts & Chart.js -->
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Cinzel:wght@700&family=Rajdhani:wght@500;600;700&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
+  <style>
+    :root {
+      --bg-dark: #08070d;
+      --bg-card: rgba(18, 14, 32, 0.75);
+      --bg-card-hover: rgba(28, 22, 50, 0.85);
+      --border: rgba(147, 51, 234, 0.25);
+      --border-glow: rgba(168, 85, 247, 0.6);
+      --primary: #a855f7;
+      --primary-glow: rgba(168, 85, 247, 0.4);
+      --accent-cyan: #06b6d4;
+      --accent-gold: #fbbf24;
+      --accent-red: #f43f5e;
+      --accent-green: #10b981;
+      --text-main: #f3f4f6;
+      --text-muted: #9ca3af;
+    }
+
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body {
+      font-family: 'Inter', sans-serif;
+      background: var(--bg-dark);
+      color: var(--text-main);
+      min-height: 100vh;
+      overflow-x: hidden;
+      background-image: 
+        radial-gradient(circle at 15% 15%, rgba(112, 26, 117, 0.15) 0%, transparent 40%),
+        radial-gradient(circle at 85% 85%, rgba(6, 182, 212, 0.12) 0%, transparent 40%),
+        radial-gradient(circle at 50% 50%, rgba(20, 10, 35, 0.6) 0%, transparent 100%);
+    }
+
+    /* Header & Navigation */
+    header {
+      background: rgba(10, 8, 20, 0.85);
+      backdrop-filter: blur(16px);
+      border-bottom: 1px solid var(--border);
+      position: sticky;
+      top: 0;
+      z-index: 100;
+      padding: 1rem 2rem;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+    }
+
+    .brand {
+      display: flex;
+      align-items: center;
+      gap: 1rem;
+    }
+    .brand-icon {
+      font-size: 2rem;
+      background: linear-gradient(135deg, #c084fc, #06b6d4);
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+    }
+    .brand-title {
+      font-family: 'Cinzel', serif;
+      font-size: 1.5rem;
+      font-weight: 700;
+      letter-spacing: 1.5px;
+      color: #fff;
+      text-shadow: 0 0 15px var(--primary-glow);
+    }
+    .brand-subtitle {
+      font-size: 0.75rem;
+      color: var(--accent-cyan);
+      text-transform: uppercase;
+      letter-spacing: 2px;
+      font-family: 'Rajdhani', sans-serif;
+    }
+
+    .header-status {
+      display: flex;
+      align-items: center;
+      gap: 1.5rem;
+    }
+    .status-pill {
+      display: flex;
+      align-items: center;
+      gap: 0.5rem;
+      background: rgba(16, 185, 129, 0.1);
+      border: 1px solid rgba(16, 185, 129, 0.3);
+      padding: 0.4rem 0.9rem;
+      border-radius: 9999px;
+      font-size: 0.82rem;
+      font-weight: 600;
+      color: #34d399;
+    }
+    .pulse-dot {
+      width: 8px;
+      height: 8px;
+      border-radius: 50%;
+      background: #10b981;
+      box-shadow: 0 0 10px #10b981;
+      animation: pulse 1.8s infinite;
+    }
+    @keyframes pulse {
+      0% { transform: scale(0.9); opacity: 0.8; }
+      50% { transform: scale(1.3); opacity: 1; box-shadow: 0 0 14px #10b981; }
+      100% { transform: scale(0.9); opacity: 0.8; }
+    }
+    .db-badge {
+      background: rgba(168, 85, 247, 0.1);
+      border: 1px solid rgba(168, 85, 247, 0.3);
+      padding: 0.4rem 0.9rem;
+      border-radius: 9999px;
+      font-size: 0.82rem;
+      color: #c084fc;
+      font-family: 'Rajdhani', sans-serif;
+      font-weight: 600;
+    }
+
+    /* Navigation Tabs */
+    .nav-tabs {
+      display: flex;
+      gap: 0.5rem;
+      background: rgba(18, 14, 32, 0.6);
+      padding: 0.3rem;
+      border-radius: 12px;
+      border: 1px solid rgba(255, 255, 255, 0.05);
+    }
+    .tab-btn {
+      background: transparent;
+      border: none;
+      color: var(--text-muted);
+      padding: 0.55rem 1.2rem;
+      border-radius: 8px;
+      font-family: 'Rajdhani', sans-serif;
+      font-weight: 700;
+      font-size: 0.95rem;
+      cursor: pointer;
+      transition: all 0.2s ease;
+      display: flex;
+      align-items: center;
+      gap: 0.4rem;
+    }
+    .tab-btn:hover { color: #fff; background: rgba(255, 255, 255, 0.05); }
+    .tab-btn.active {
+      color: #fff;
+      background: linear-gradient(135deg, rgba(168, 85, 247, 0.3), rgba(6, 182, 212, 0.2));
+      border: 1px solid var(--border-glow);
+      box-shadow: 0 0 12px var(--primary-glow);
+    }
+
+    /* Container & Layout */
+    .container {
+      max-width: 1440px;
+      margin: 1.5rem auto;
+      padding: 0 1.5rem;
+    }
+
+    /* Metrics Grid */
+    .stats-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+      gap: 1rem;
+      margin-bottom: 1.8rem;
+    }
+    .stat-card {
+      background: var(--bg-card);
+      border: 1px solid var(--border);
+      border-radius: 16px;
+      padding: 1.25rem 1.4rem;
+      backdrop-filter: blur(12px);
+      display: flex;
+      flex-direction: column;
+      gap: 0.4rem;
+      position: relative;
+      overflow: hidden;
+      transition: transform 0.2s ease, border-color 0.2s ease;
+    }
+    .stat-card:hover {
+      transform: translateY(-3px);
+      border-color: var(--border-glow);
+    }
+    .stat-card::after {
+      content: "";
+      position: absolute;
+      top: 0; left: 0; right: 0; height: 3px;
+      background: linear-gradient(90deg, var(--primary), var(--accent-cyan));
+    }
+    .stat-label {
+      font-family: 'Rajdhani', sans-serif;
+      font-size: 0.85rem;
+      font-weight: 700;
+      color: var(--text-muted);
+      letter-spacing: 1px;
+      text-transform: uppercase;
+    }
+    .stat-value {
+      font-family: 'Rajdhani', sans-serif;
+      font-size: 2.2rem;
+      font-weight: 700;
+      color: #fff;
+      display: flex;
+      align-items: baseline;
+      gap: 0.5rem;
+    }
+    .stat-sub {
+      font-size: 0.78rem;
+      color: var(--accent-cyan);
+    }
+
+    /* Sections */
+    .tab-content { display: none; }
+    .tab-content.active { display: block; animation: fadeIn 0.3s ease; }
+    @keyframes fadeIn { from { opacity: 0; transform: translateY(6px); } to { opacity: 1; transform: translateY(0); } }
+
+    /* Match Feed & Tables */
+    .section-title {
+      font-family: 'Rajdhani', sans-serif;
+      font-size: 1.35rem;
+      font-weight: 700;
+      color: #fff;
+      margin-bottom: 1rem;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      letter-spacing: 1px;
+    }
+
+    .dashboard-split {
+      display: grid;
+      grid-template-columns: 2fr 1fr;
+      gap: 1.5rem;
+      margin-bottom: 2rem;
+    }
+    @media (max-width: 1024px) {
+      .dashboard-split { grid-template-columns: 1fr; }
+    }
+
+    .card-panel {
+      background: var(--bg-card);
+      border: 1px solid var(--border);
+      border-radius: 18px;
+      padding: 1.5rem;
+      backdrop-filter: blur(12px);
+    }
+
+    /* Live Feed Items */
+    .feed-list {
+      display: flex;
+      flex-direction: column;
+      gap: 0.85rem;
+      max-height: 680px;
+      overflow-y: auto;
+      padding-right: 0.5rem;
+    }
+    .feed-item {
+      background: rgba(22, 17, 38, 0.7);
+      border: 1px solid rgba(255, 255, 255, 0.06);
+      border-left: 4px solid var(--primary);
+      border-radius: 12px;
+      padding: 1rem 1.2rem;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      transition: all 0.2s ease;
+    }
+    .feed-item:hover {
+      background: var(--bg-card-hover);
+      border-color: rgba(168, 85, 247, 0.4);
+      transform: translateX(3px);
+    }
+    .feed-item.win { border-left-color: var(--accent-gold); }
+    .feed-item.loss { border-left-color: var(--accent-red); }
+
+    .feed-left {
+      display: flex;
+      flex-direction: column;
+      gap: 0.3rem;
+    }
+    .feed-header {
+      display: flex;
+      align-items: center;
+      gap: 0.6rem;
+      font-size: 0.95rem;
+      font-weight: 600;
+    }
+    .outcome-pill {
+      font-size: 0.72rem;
+      font-weight: 700;
+      padding: 0.2rem 0.55rem;
+      border-radius: 6px;
+      text-transform: uppercase;
+      font-family: 'Rajdhani', sans-serif;
+    }
+    .outcome-pill.win { background: rgba(251, 191, 36, 0.15); color: #fbbf24; border: 1px solid rgba(251, 191, 36, 0.3); }
+    .outcome-pill.loss { background: rgba(244, 63, 94, 0.15); color: #f43f5e; border: 1px solid rgba(244, 63, 94, 0.3); }
+
+    .feed-meta {
+      font-size: 0.8rem;
+      color: var(--text-muted);
+      display: flex;
+      gap: 1rem;
+    }
+
+    .feed-right {
+      display: flex;
+      flex-direction: column;
+      align-items: flex-end;
+      gap: 0.35rem;
+    }
+    .playstyle-badge {
+      font-family: 'Rajdhani', sans-serif;
+      font-size: 0.88rem;
+      font-weight: 700;
+      padding: 0.3rem 0.75rem;
+      border-radius: 8px;
+      letter-spacing: 0.5px;
+      display: flex;
+      align-items: center;
+      gap: 0.4rem;
+    }
+    .badge-aggressive { background: rgba(244, 63, 94, 0.2); color: #fb7185; border: 1px solid rgba(244, 63, 94, 0.4); }
+    .badge-defensive  { background: rgba(16, 185, 129, 0.2); color: #34d399; border: 1px solid rgba(16, 185, 129, 0.4); }
+    .badge-optimal    { background: rgba(168, 85, 247, 0.2); color: #c084fc; border: 1px solid rgba(168, 85, 247, 0.4); }
+    .badge-random     { background: rgba(245, 158, 11, 0.2); color: #fbbf24; border: 1px solid rgba(245, 158, 11, 0.4); }
+
+    /* Tables */
+    .custom-table {
+      width: 100%;
+      border-collapse: collapse;
+      font-size: 0.88rem;
+    }
+    .custom-table th {
+      text-align: left;
+      padding: 0.75rem 1rem;
+      color: var(--text-muted);
+      font-family: 'Rajdhani', sans-serif;
+      font-size: 0.85rem;
+      text-transform: uppercase;
+      border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+    }
+    .custom-table td {
+      padding: 0.85rem 1rem;
+      border-bottom: 1px solid rgba(255, 255, 255, 0.04);
+    }
+    .custom-table tr:hover td {
+      background: rgba(255, 255, 255, 0.02);
+    }
+
+    /* Federated Learning Hub Styles */
+    .fl-topology {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 2rem;
+      padding: 2rem 1rem;
+      background: radial-gradient(circle at center, rgba(168, 85, 247, 0.1) 0%, transparent 70%);
+      border: 1px dashed rgba(168, 85, 247, 0.3);
+      border-radius: 20px;
+      margin-bottom: 2rem;
+      position: relative;
+    }
+    .server-node {
+      background: linear-gradient(135deg, rgba(30, 20, 60, 0.9), rgba(15, 10, 30, 0.95));
+      border: 2px solid var(--primary);
+      box-shadow: 0 0 25px var(--primary-glow);
+      border-radius: 16px;
+      padding: 1.2rem 2rem;
+      text-align: center;
+      min-width: 280px;
+    }
+    .server-title {
+      font-family: 'Cinzel', serif;
+      font-size: 1.1rem;
+      color: #fff;
+    }
+    .server-version {
+      font-size: 0.8rem;
+      color: var(--accent-cyan);
+      font-family: 'Rajdhani', sans-serif;
+      font-weight: 700;
+    }
+
+    .client-nodes {
+      display: flex;
+      flex-wrap: wrap;
+      justify-content: center;
+      gap: 1.5rem;
+      max-width: 900px;
+    }
+    .client-chip {
+      background: rgba(18, 14, 32, 0.8);
+      border: 1px solid rgba(6, 182, 212, 0.3);
+      box-shadow: 0 0 12px rgba(6, 182, 212, 0.15);
+      border-radius: 12px;
+      padding: 0.75rem 1.1rem;
+      display: flex;
+      align-items: center;
+      gap: 0.8rem;
+    }
+    .chip-indicator {
+      width: 10px;
+      height: 10px;
+      border-radius: 50%;
+      background: var(--accent-cyan);
+      box-shadow: 0 0 8px var(--accent-cyan);
+    }
+
+    /* Buttons */
+    .btn-fl {
+      background: linear-gradient(135deg, #9333ea, #06b6d4);
+      border: none;
+      color: #fff;
+      font-family: 'Rajdhani', sans-serif;
+      font-weight: 700;
+      font-size: 1.05rem;
+      padding: 0.8rem 1.8rem;
+      border-radius: 12px;
+      cursor: pointer;
+      box-shadow: 0 0 16px var(--primary-glow);
+      transition: all 0.2s ease;
+      display: inline-flex;
+      align-items: center;
+      gap: 0.6rem;
+    }
+    .btn-fl:hover {
+      transform: translateY(-2px);
+      box-shadow: 0 0 25px rgba(168, 85, 247, 0.6);
+    }
+    .btn-fl:active { transform: translateY(0); }
+
+    .fl-controls {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 1.5rem;
+      align-items: center;
+      margin-bottom: 2rem;
+      background: rgba(15, 12, 28, 0.6);
+      padding: 1.2rem;
+      border-radius: 14px;
+      border: 1px solid var(--border);
+    }
+    .control-group {
+      display: flex;
+      flex-direction: column;
+      gap: 0.3rem;
+    }
+    .control-label {
+      font-family: 'Rajdhani', sans-serif;
+      font-size: 0.82rem;
+      color: var(--text-muted);
+      font-weight: 700;
+    }
+    .control-input {
+      background: rgba(255, 255, 255, 0.05);
+      border: 1px solid rgba(255, 255, 255, 0.15);
+      color: #fff;
+      padding: 0.5rem 0.8rem;
+      border-radius: 8px;
+      font-family: 'Inter', sans-serif;
+      font-size: 0.9rem;
+    }
+
+    /* Auth Components */
+    .auth-btn-login {
+      background: linear-gradient(135deg, #9333ea, #06b6d4);
+      border: none;
+      color: #fff;
+      font-family: 'Rajdhani', sans-serif;
+      font-weight: 700;
+      font-size: 0.88rem;
+      padding: 0.45rem 1rem;
+      border-radius: 9999px;
+      cursor: pointer;
+      transition: all 0.2s ease;
+      display: inline-flex;
+      align-items: center;
+      gap: 0.45rem;
+    }
+    .auth-btn-login:hover {
+      box-shadow: 0 0 15px rgba(168, 85, 247, 0.6);
+      transform: translateY(-1px);
+    }
+    .auth-user-pill {
+      display: inline-flex;
+      align-items: center;
+      gap: 0.5rem;
+      background: rgba(168, 85, 247, 0.15);
+      border: 1px solid rgba(168, 85, 247, 0.4);
+      padding: 0.35rem 0.85rem;
+      border-radius: 9999px;
+      font-size: 0.82rem;
+      font-weight: 600;
+      color: #fff;
+    }
+    .auth-btn-logout {
+      background: rgba(244, 63, 94, 0.2);
+      border: 1px solid rgba(244, 63, 94, 0.4);
+      color: #fda4af;
+      padding: 0.2rem 0.55rem;
+      border-radius: 6px;
+      font-size: 0.75rem;
+      cursor: pointer;
+      transition: all 0.15s ease;
+    }
+    .auth-btn-logout:hover {
+      background: rgba(244, 63, 94, 0.4);
+      color: #fff;
+    }
+    .modal-overlay {
+      position: fixed;
+      top: 0; left: 0; width: 100vw; height: 100vh;
+      background: rgba(0, 0, 0, 0.78);
+      backdrop-filter: blur(8px);
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      z-index: 1000;
+      opacity: 0;
+      pointer-events: none;
+      transition: opacity 0.2s ease;
+    }
+    .modal-overlay.active {
+      opacity: 1;
+      pointer-events: auto;
+    }
+    .modal-card {
+      background: rgba(18, 14, 32, 0.96);
+      border: 1px solid var(--border-glow);
+      box-shadow: 0 0 35px var(--primary-glow);
+      border-radius: 18px;
+      padding: 2rem;
+      width: 100%;
+      max-width: 420px;
+      position: relative;
+    }
+
+    /* Scrollbars */
+    ::-webkit-scrollbar { width: 6px; }
+    ::-webkit-scrollbar-track { background: transparent; }
+    ::-webkit-scrollbar-thumb { background: rgba(255, 255, 255, 0.1); border-radius: 4px; }
+    ::-webkit-scrollbar-thumb:hover { background: rgba(255, 255, 255, 0.2); }
+  </style>
+</head>
+<body>
+
+  <!-- Top Header -->
+  <header>
+    <div class="brand">
+      <div class="brand-icon">⚡</div>
+      <div>
+        <div class="brand-title">ARCANE CLASH</div>
+        <div class="brand-subtitle">Federated Playstyle Intelligence & Observatory</div>
+      </div>
+    </div>
+
+    <!-- Navigation Tabs -->
+    <div class="nav-tabs">
+      <button class="tab-btn active" onclick="switchTab('feed')">🛰️ Live Telemetry</button>
+      <button class="tab-btn" onclick="switchTab('players')">👥 Player Directory</button>
+      <button class="tab-btn" onclick="switchTab('federated')">🌐 Federated Learning Hub</button>
+    </div>
+
+    <!-- Status Badges & Auth Slot -->
+    <div class="header-status">
+      <div id="auth-header-slot"></div>
+      <div class="status-pill">
+        <div class="pulse-dot"></div>
+        <span id="active-players-pill">0 Playing Right Now</span>
+      </div>
+      <div class="db-badge" id="db-mode-badge">Database: Connecting...</div>
+    </div>
+  </header>
+
+  <div class="container">
+
+    <!-- KPI Summary Grid -->
+    <div class="stats-grid">
+      <div class="stat-card">
+        <div class="stat-label">🟢 Currently Playing</div>
+        <div class="stat-value" id="stat-active">0</div>
+        <div class="stat-sub">Live heartbeats (last 45s)</div>
+      </div>
+      <div class="stat-card">
+        <div class="stat-label">👥 Total Players</div>
+        <div class="stat-value" id="stat-players">0</div>
+        <div class="stat-sub">Unique combatants observed</div>
+      </div>
+      <div class="stat-card">
+        <div class="stat-label">⚔️ Battles Recorded</div>
+        <div class="stat-value" id="stat-matches">0</div>
+        <div class="stat-sub">Match telemetry logs stored</div>
+      </div>
+      <div class="stat-card">
+        <div class="stat-label">🏆 Community Win Rate</div>
+        <div class="stat-value" id="stat-winrate">0%</div>
+        <div class="stat-sub">Player victory ratio</div>
+      </div>
+      <div class="stat-card">
+        <div class="stat-label">🔮 Model Checkpoint</div>
+        <div class="stat-value" style="font-size: 1.5rem; color: #c084fc;" id="stat-model">v1.0 (FL)</div>
+        <div class="stat-sub">49-feature MLP Classifier</div>
+      </div>
+    </div>
+
+    <!-- ═══════════════════════════════════════════════════════════════════ -->
+    <!-- TAB 1: LIVE TELEMETRY & MATCH FEED -->
+    <!-- ═══════════════════════════════════════════════════════════════════ -->
+    <div id="tab-feed" class="tab-content active">
+      <div class="dashboard-split">
+        <!-- Live Matches Feed -->
+        <div class="card-panel">
+          <div class="section-title">
+            <div style="display: flex; align-items: center; gap: 0.8rem; flex-wrap: wrap;">
+              <span>⚔️ Recent Completed Matches</span>
+              <div style="display: inline-flex; align-items: center; gap: 0.4rem;">
+                <label for="match-user-filter" style="font-size: 0.78rem; color: var(--accent-cyan); font-family: 'Rajdhani', sans-serif; font-weight: 700;">USER FILTER:</label>
+                <select id="match-user-filter" class="control-input" style="padding: 0.25rem 0.6rem; border-radius: 6px; font-size: 0.8rem; background: rgba(18,14,32,0.9); cursor: pointer;" onchange="onUserFilterChange()">
+                  <option value="all">🌐 All Players</option>
+                </select>
+              </div>
+            </div>
+            <span style="font-size: 0.8rem; color: var(--text-muted); font-weight: 500;">Auto-syncing every 2.5s</span>
+          </div>
+          <div class="feed-list" id="match-feed">
+            <div style="text-align: center; color: var(--text-muted); padding: 3rem;">Loading match telemetry...</div>
+          </div>
+        </div>
+
+        <!-- Right Side: Analytics Charts -->
+        <div style="display: flex; flex-direction: column; gap: 1.5rem;">
+          <div class="card-panel">
+            <div class="section-title">📊 Playstyle Distribution</div>
+            <div style="height: 240px; position: relative;">
+              <canvas id="playstyleChart"></canvas>
+            </div>
+          </div>
+
+          <div class="card-panel">
+            <div class="section-title">🧙 Popular Hero Classes</div>
+            <div style="height: 210px; position: relative;">
+              <canvas id="heroChart"></canvas>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ═══════════════════════════════════════════════════════════════════ -->
+    <!-- TAB 2: PLAYER DIRECTORY -->
+    <!-- ═══════════════════════════════════════════════════════════════════ -->
+    <div id="tab-players" class="tab-content">
+      <div class="card-panel">
+        <div class="section-title">
+          <span>👥 Observed Player Profiles & Client Metadata</span>
+          <span style="font-size: 0.82rem; color: var(--accent-cyan);">Universal Client Network</span>
+        </div>
+        <table class="custom-table">
+          <thead>
+            <tr>
+              <th>Player ID</th>
+              <th>Status</th>
+              <th>Total Battles</th>
+              <th>Win / Loss</th>
+              <th>ML Playstyle</th>
+              <th>🤖 Agent Insight</th>
+              <th>Last Active</th>
+            </tr>
+          </thead>
+          <tbody id="player-table-body">
+            <tr><td colspan="7" style="text-align: center; color: var(--text-muted);">Loading players...</td></tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+
+    <!-- ═══════════════════════════════════════════════════════════════════ -->
+    <!-- TAB 3: FEDERATED LEARNING HUB -->
+    <!-- ═══════════════════════════════════════════════════════════════════ -->
+    <div id="tab-federated" class="tab-content">
+      
+      <!-- Interactive FL Topology Diagram -->
+      <div class="fl-topology">
+        <div class="server-node">
+          <div class="server-title">🏛️ CENTRAL FEDERATED AGGREGATOR</div>
+          <div class="server-version">Global Model: PlaystyleClassifier (FedAvg)</div>
+          <div style="font-size: 0.85rem; color: #a855f7; margin-top: 0.4rem;" id="fl-global-acc">Global Benchmark: 100.0%</div>
+        </div>
+
+        <div style="font-size: 0.85rem; color: var(--text-muted); text-transform: uppercase; letter-spacing: 2px;">
+          ⬇ Privacy-Preserving Weight Updates (Differential Privacy ε=1.5) ⬆
+        </div>
+
+        <div class="client-nodes" id="fl-client-shards">
+          <!-- Dynamically populated client shard chips -->
+          <div class="client-chip"><div class="chip-indicator"></div><span>Client Shard (Detecting...)</span></div>
+        </div>
+      </div>
+
+      <!-- Controls Deck -->
+      <div class="fl-controls">
+        <button class="btn-fl" id="btn-run-fl" onclick="runFederatedRound()">
+          <span>⚡ Trigger Federated Learning Round</span>
+        </button>
+
+        <div class="control-group">
+          <label class="control-label">DP Epsilon (ε)</label>
+          <input type="number" id="fl-epsilon" class="control-input" value="1.5" step="0.1" min="0.1" max="10.0" style="width: 90px;">
+        </div>
+
+        <div class="control-group">
+          <label class="control-label">Local Epochs (E)</label>
+          <input type="number" id="fl-epochs" class="control-input" value="3" min="1" max="15" style="width: 80px;">
+        </div>
+
+        <div class="control-group">
+          <label class="control-label">Learning Rate (η)</label>
+          <input type="number" id="fl-lr" class="control-input" value="0.005" step="0.001" style="width: 95px;">
+        </div>
+
+        <div style="margin-left: auto;">
+          <a href="/api/fl/download_model" class="tab-btn" style="text-decoration: none; border: 1px solid var(--border);">
+            📥 Download Global Weights (.pt)
+          </a>
+        </div>
+      </div>
+
+      <!-- FL Analytics Split -->
+      <div class="dashboard-split">
+        <div class="card-panel">
+          <div class="section-title">📈 Federated Convergence Across Rounds</div>
+          <div style="height: 280px; position: relative;">
+            <canvas id="flConvergenceChart"></canvas>
+          </div>
+        </div>
+
+        <div class="card-panel">
+          <div class="section-title">📊 Client Shard Contributions (FedAvg)</div>
+          <div style="height: 280px; position: relative;">
+            <canvas id="flContributionChart"></canvas>
+          </div>
+        </div>
+      </div>
+
+    </div>
+
+  </div>
+
+  <script>
+    // Tab switching
+    function switchTab(tabId) {
+      document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
+      document.querySelectorAll('.tab-content').forEach(c => c.classList.remove('active'));
+      event.currentTarget.classList.add('active');
+      document.getElementById('tab-' + tabId).classList.add('active');
+    }
+
+    // Chart.js instances
+    let playstyleChart = null;
+    let heroChart = null;
+    let flConvergenceChart = null;
+    let flContributionChart = null;
+
+    function initCharts() {
+      const pCtx = document.getElementById('playstyleChart').getContext('2d');
+      playstyleChart = new Chart(pCtx, {
+        type: 'doughnut',
+        data: {
+          labels: ['Aggressive', 'Defensive', 'Optimal', 'Random'],
+          datasets: [{
+            data: [0, 0, 0, 0],
+            backgroundColor: ['#f43f5e', '#10b981', '#a855f7', '#f59e0b'],
+            borderWidth: 0
+          }]
+        },
+        options: {
+          responsive: true,
+          maintainAspectRatio: false,
+          plugins: {
+            legend: { position: 'bottom', labels: { color: '#9ca3af', font: { family: 'Rajdhani', size: 12 } } }
+          }
+        }
+      });
+
+      const hCtx = document.getElementById('heroChart').getContext('2d');
+      heroChart = new Chart(hCtx, {
+        type: 'bar',
+        data: {
+          labels: ['Fire Wizard', 'Lightning Mage', 'Wanderer'],
+          datasets: [{
+            label: 'Matches',
+            data: [0, 0, 0],
+            backgroundColor: '#06b6d4',
+            borderRadius: 6
+          }]
+        },
+        options: {
+          responsive: true,
+          maintainAspectRatio: false,
+          plugins: { legend: { display: false } },
+          scales: {
+            x: { ticks: { color: '#9ca3af' }, grid: { display: false } },
+            y: { ticks: { color: '#9ca3af' }, grid: { color: 'rgba(255,255,255,0.05)' } }
+          }
+        }
+      });
+
+      const flCtx = document.getElementById('flConvergenceChart').getContext('2d');
+      flConvergenceChart = new Chart(flCtx, {
+        type: 'line',
+        data: {
+          labels: ['Init', 'Round 1', 'Round 2', 'Round 3'],
+          datasets: [
+            {
+              label: 'Global Accuracy (%)',
+              data: [92.0, 95.5, 98.2, 100.0],
+              borderColor: '#10b981',
+              backgroundColor: 'rgba(16, 185, 129, 0.1)',
+              tension: 0.3,
+              fill: true
+            },
+            {
+              label: 'Global Loss',
+              data: [0.65, 0.32, 0.12, 0.04],
+              borderColor: '#f43f5e',
+              tension: 0.3,
+              yAxisID: 'y1'
+            }
+          ]
+        },
+        options: {
+          responsive: true,
+          maintainAspectRatio: false,
+          scales: {
+            x: { ticks: { color: '#9ca3af' } },
+            y: { ticks: { color: '#10b981' }, min: 0, max: 100 },
+            y1: { position: 'right', ticks: { color: '#f43f5e' }, grid: { display: false } }
+          }
+        }
+      });
+
+      const fcCtx = document.getElementById('flContributionChart').getContext('2d');
+      flContributionChart = new Chart(fcCtx, {
+        type: 'bar',
+        data: {
+          labels: [],
+          datasets: [{
+            label: 'Samples Contributed (n_k)',
+            data: [],
+            backgroundColor: '#a855f7',
+            borderRadius: 6
+          }]
+        },
+        options: {
+          responsive: true,
+          maintainAspectRatio: false,
+          plugins: { legend: { display: false } },
+          scales: {
+            x: { ticks: { color: '#9ca3af' } },
+            y: { ticks: { color: '#9ca3af' }, grid: { color: 'rgba(255,255,255,0.05)' } }
+          }
+        }
+      });
+    }
+
+    // Unified Polling Update
+    let isFetching = false;
+    async function fetchOverview() {
+      if (isFetching) return;
+      isFetching = true;
+      try {
+        const res = await fetch('/api/overview');
+        if (!res.ok) return;
+        const data = await res.json();
+        
+        // 1. Update Stats & KPIs
+        const stats = data.stats || {};
+        document.getElementById('stat-active').innerText = stats.active_players_count || 0;
+        document.getElementById('stat-players').innerText = stats.total_players_count || 0;
+        document.getElementById('stat-matches').innerText = stats.total_matches_count || 0;
+        document.getElementById('stat-winrate').innerText = (stats.win_rate || 0) + '%';
+        document.getElementById('active-players-pill').innerText = `${stats.active_players_count || 0} Playing Right Now`;
+        document.getElementById('db-mode-badge').innerText = `Database: ${stats.db_mode || 'Online'}`;
+
+        const pDist = stats.playstyle_distribution || {};
+        if (playstyleChart) {
+          playstyleChart.data.datasets[0].data = [
+            pDist['Aggressive'] || 0,
+            pDist['Defensive'] || 0,
+            pDist['Optimal'] || 0,
+            pDist['Random'] || 0
+          ];
+          playstyleChart.update();
+        }
+
+        const hPop = stats.hero_popularity || {};
+        const heroLabels = Object.keys(hPop);
+        const heroVals = Object.values(hPop);
+        if (heroChart && heroLabels.length > 0) {
+          heroChart.data.labels = heroLabels;
+          heroChart.data.datasets[0].data = heroVals;
+          heroChart.update();
+        }
+
+        // 2. Update Recent Matches Feed with User Filter
+        let matches = data.matches || [];
+        const filterEl = document.getElementById('match-user-filter');
+        const selectedUser = filterEl ? filterEl.value : 'all';
+
+        if (filterEl) {
+          const playersList = data.players || [];
+          const usersList = data.users || [];
+          const knownUsers = new Set();
+          playersList.forEach(p => { if (p.player_id) knownUsers.add(p.player_id); });
+          usersList.forEach(u => { if (u.username) knownUsers.add(u.username); });
+
+          const currentOptions = Array.from(filterEl.options).map(o => o.value);
+          knownUsers.forEach(u => {
+            if (u && !currentOptions.includes(u)) {
+              const opt = document.createElement('option');
+              opt.value = u;
+              opt.innerText = `👤 ${u}`;
+              filterEl.appendChild(opt);
+            }
+          });
+        }
+
+        if (selectedUser && selectedUser !== 'all') {
+          matches = matches.filter(m => (m.player_id === selectedUser || (m.summary && m.summary.player_id === selectedUser)));
+        }
+
+        const container = document.getElementById('match-feed');
+        if (matches.length === 0) {
+          container.innerHTML = `<div style="text-align: center; color: var(--text-muted); padding: 3rem;">No match telemetry found ${selectedUser !== 'all' ? 'for user ' + selectedUser : 'yet'}. Play a match in game!</div>`;
+        } else {
+          container.innerHTML = matches.map(m => {
+            const won = m.outcome === 'win';
+            const p = m.prediction || {};
+            const persona = p.persona || 'Optimal';
+            const conf = p.confidence_pct || 90;
+            const badgeClass = 'badge-' + persona.toLowerCase();
+            const keyStats = p.key_stats || {};
+            const timeStr = m.timestamp ? new Date(m.timestamp).toLocaleTimeString() : 'Just now';
+            const agent = m.agent_analysis || {};
+
+            let agentStrip = '';
+            if (agent.playstyle_label) {
+              const tip = agent.coaching_tip || agent.agent_summary || '';
+              const shortTip = tip.length > 95 ? tip.slice(0, 95) + '…' : tip;
+              const grade = agent.counter_play_grade || '';
+              agentStrip = `
+                <div style="margin-top: 0.35rem; padding: 0.3rem 0.6rem; border-radius: 6px; background: rgba(168, 85, 247, 0.12); border: 1px dashed rgba(168, 85, 247, 0.35); font-size: 0.73rem; display: flex; align-items: center; gap: 0.5rem; flex-wrap: wrap;">
+                  <span style="font-weight: 700; color: #c084fc;">🤖 Groq Agent:</span>
+                  <span class="playstyle-badge badge-${agent.playstyle_label.toLowerCase()}" style="font-size:0.68rem;padding:1px 6px">${agent.playstyle_label}</span>
+                  ${grade ? `<span style="color:#06b6d4;font-weight:600">Grade: ${grade}</span>` : ''}
+                  ${shortTip ? `<span style="color: #e2e8f0; font-style: italic;">• "${shortTip}"</span>` : ''}
+                </div>
+              `;
+            }
+
+            return `
+              <div class="feed-item ${won ? 'win' : 'loss'}">
+                <div class="feed-left" style="flex:1">
+                  <div class="feed-header">
+                    <span class="outcome-pill ${won ? 'win' : 'loss'}">${won ? 'VICTORY' : 'DEFEAT'}</span>
+                    <span>${m.hero_class || 'Hero'} vs ${m.boss_variant || 'Boss'}</span>
+                    <span style="font-size: 0.75rem; color: var(--text-muted);">${m.total_turns || 0} turns</span>
+                  </div>
+                  <div class="feed-meta">
+                    <span>Player: <strong style="color: #c084fc;">${m.player_id}</strong></span>
+                    <span>Counter-play: <strong>${keyStats.counter_rate || 0}%</strong></span>
+                    <span>Damage Trade: <strong>${keyStats.damage_trade_ratio || 1.0}x</strong></span>
+                    <span>${timeStr}</span>
+                  </div>
+                  ${agentStrip}
+                </div>
+                <div class="feed-right" style="margin-left:1rem;flex-shrink:0">
+                  <div class="playstyle-badge ${badgeClass}">
+                    ${p.icon || '⚔️'} ${p.title || persona} (${conf}%)
+                  </div>
+                  <span style="font-size: 0.72rem; color: var(--accent-cyan); font-family: 'Rajdhani', sans-serif;">
+                    CLASSIFIED AFTER BATTLE
+                  </span>
+                </div>
+              </div>
+            `;
+          }).join('');
+        }
+
+        // 3. Update Player Directory
+        const players = data.players || [];
+        const tbody = document.getElementById('player-table-body');
+        if (players.length === 0) {
+          tbody.innerHTML = '<tr><td colspan="7" style="text-align: center; color: var(--text-muted);">No players recorded yet.</td></tr>';
+        } else {
+          const now = Date.now() / 1000;
+          tbody.innerHTML = players.map(p => {
+            const isOnline = (p.is_online !== undefined) ? Boolean(p.is_online) : ((now - (p.last_seen || 0)) <= 45);
+            const pred = p.latest_prediction || {};
+            const agent = p.last_agent_analysis || {};
+            const lastStr = p.last_seen ? new Date(p.last_seen * 1000).toLocaleTimeString() : 'Never';
+
+            // ML badge
+            const mlBadge = pred.persona
+              ? `<span class="playstyle-badge badge-${(pred.persona||'optimal').toLowerCase()}">${pred.title || pred.persona}</span>`
+              : `<span style="color:var(--text-muted);font-size:0.8rem">Pending</span>`;
+
+            // Agent insight cell
+            let agentCell = `<span style="color:var(--text-muted);font-size:0.76rem">Not yet analysed</span>`;
+            if (agent.playstyle_label) {
+              const confColor = agent.playstyle_confidence === 'High' ? '#10b981'
+                : agent.playstyle_confidence === 'Medium' ? '#fbbf24' : '#f43f5e';
+              const tip = agent.coaching_tip || agent.agent_summary || '';
+              const maxTip = 60;
+              const shortTip = tip.length > maxTip ? tip.slice(0, maxTip) + '…' : tip;
+              const grade = agent.counter_play_grade || '?';
+              const risk = agent.risk_profile || '?';
+              agentCell = `
+                <div style="display:flex;flex-direction:column;gap:3px">
+                  <div style="display:flex;align-items:center;gap:6px">
+                    <span class="playstyle-badge badge-${agent.playstyle_label.toLowerCase()}" style="font-size:0.72rem;padding:2px 8px">
+                      ${agent.playstyle_label}
+                    </span>
+                    <span style="font-size:0.72rem;color:${confColor};font-weight:600">${agent.playstyle_confidence}</span>
+                    <span style="font-size:0.7rem;color:var(--text-muted)">• Counter: <strong style="color:#06b6d4">${grade}</strong> • Risk: ${risk}</span>
+                  </div>
+                  ${shortTip ? `<div style="font-size:0.7rem;color:#c4b5fd;font-style:italic">💡 ${shortTip}</div>` : ''}
+                </div>`;
+            }
+
+            return `
+              <tr>
+                <td><strong style="color:#fff">${p.player_id}</strong></td>
+                <td>
+                  <span style="display:inline-flex;align-items:center;gap:0.4rem;color:${isOnline?'#34d399':'#9ca3af'};font-weight:600">
+                    <span style="width:8px;height:8px;border-radius:50%;background:${isOnline?'#10b981':'#6b7280'}"></span>
+                    ${isOnline ? 'Online' : 'Offline'}
+                  </span>
+                </td>
+                <td>${p.matches_count || 0}</td>
+                <td><span style="color:#fbbf24">${p.wins||0}W</span> / <span style="color:#f43f5e">${p.losses||0}L</span></td>
+                <td>${mlBadge}</td>
+                <td style="max-width:280px">${agentCell}</td>
+                <td style="color:var(--text-muted)">${lastStr}</td>
+              </tr>
+            `;
+          }).join('');
+
+          // Update client chips in FL Hub
+          const shardsContainer = document.getElementById('fl-client-shards');
+          if (shardsContainer) {
+            shardsContainer.innerHTML = players.slice(0, 12).map(p => `
+              <div class="client-chip">
+                <div class="chip-indicator"></div>
+                <div>
+                  <div style="font-weight: 600; font-size: 0.88rem; color: #fff;">${p.player_id}</div>
+                  <div style="font-size: 0.72rem; color: var(--text-muted);">${p.matches_count || 0} match shard</div>
+                </div>
+              </div>
+            `).join('');
+          }
+
+          // Update FL contributions chart
+          if (flContributionChart) {
+            flContributionChart.data.labels = players.slice(0, 10).map(p => p.player_id);
+            flContributionChart.data.datasets[0].data = players.slice(0, 10).map(p => p.matches_count || 0);
+            flContributionChart.update();
+          }
+        }
+
+      } catch (e) {
+        // Silently retry on next tick
+      } finally {
+        isFetching = false;
+      }
+    }
+
+    async function runFederatedRound() {
+      const btn = document.getElementById('btn-run-fl');
+      const eps = parseFloat(document.getElementById('fl-epsilon').value) || 1.5;
+      const epochs = parseInt(document.getElementById('fl-epochs').value) || 3;
+      const lr = parseFloat(document.getElementById('fl-lr').value) || 0.005;
+
+      btn.disabled = true;
+      btn.innerHTML = '<span>⏳ Training Round across Client Shards...</span>';
+
+      try {
+        const res = await fetch('/api/fl/train_round', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ epsilon: eps, local_epochs: epochs, lr: lr })
+        });
+        const data = await res.json();
+        if (data.success) {
+          alert(`✅ Federated Learning Round Completed!\n\nGlobal Accuracy: ${data.global_accuracy}%\nLoss: ${data.global_loss}\nParticipating Client Shards: ${data.participating_clients}\nDifferential Privacy ε: ${data.epsilon_dp}`);
+          document.getElementById('fl-global-acc').innerText = `Global Benchmark: ${data.global_accuracy}% (FedAvg)`;
+          
+          if (flConvergenceChart) {
+            const nextIdx = flConvergenceChart.data.labels.length;
+            flConvergenceChart.data.labels.push(`Round ${nextIdx}`);
+            flConvergenceChart.data.datasets[0].data.push(data.global_accuracy);
+            flConvergenceChart.data.datasets[1].data.push(data.global_loss);
+            flConvergenceChart.update();
+          }
+        } else {
+          alert(`Federated Training notice: ${data.error || 'Failed'}`);
+        }
+      } catch (e) {
+        alert("Error executing federated learning round: " + e);
+      } finally {
+        btn.disabled = false;
+        btn.innerHTML = '<span>⚡ Trigger Federated Learning Round</span>';
+      }
+    }
+
+    // Auth Management for Dashboard
+    let currentAuthMode = 'login';
+
+    function initAuthUI() {
+      const slot = document.getElementById('auth-header-slot');
+      if (!slot) return;
+      const user = localStorage.getItem('arcane_logged_user');
+      if (user) {
+        slot.innerHTML = `
+          <div class="auth-user-pill">
+            <span>👤 ${user}</span>
+            <button class="auth-btn-logout" onclick="logoutWebUser()">Logout</button>
+          </div>
+        `;
+        const filterEl = document.getElementById('match-user-filter');
+        if (filterEl && filterEl.value === 'all') {
+          for (let opt of filterEl.options) {
+            if (opt.value === user) {
+              filterEl.value = user;
+              break;
+            }
+          }
+        }
+      } else {
+        slot.innerHTML = `
+          <button class="auth-btn-login" onclick="openAuthModal('login')">
+            <span>🔑</span> Player Login
+          </button>
+        `;
+      }
+    }
+
+    function openAuthModal(mode = 'login') {
+      setModalMode(mode);
+      const modal = document.getElementById('auth-modal');
+      modal.classList.add('active');
+      document.getElementById('auth-input-user').focus();
+    }
+
+    function closeAuthModal() {
+      const modal = document.getElementById('auth-modal');
+      modal.classList.remove('active');
+      hideAuthAlert();
+    }
+
+    function setModalMode(mode) {
+      currentAuthMode = mode;
+      const title = document.getElementById('modal-title');
+      const sub = document.getElementById('modal-sub');
+      const submitBtn = document.getElementById('auth-submit-btn');
+      const tabLogin = document.getElementById('modal-tab-login');
+      const tabReg = document.getElementById('modal-tab-reg');
+      hideAuthAlert();
+
+      if (mode === 'login') {
+        title.innerText = 'PLAYER LOGIN';
+        sub.innerText = 'Log in to inspect your personal gameplay logs';
+        submitBtn.innerText = 'Login to Observatory';
+        tabLogin.classList.add('active');
+        tabReg.classList.remove('active');
+      } else {
+        title.innerText = 'REGISTER HERO ACCOUNT';
+        sub.innerText = 'Create a new player identity with username & password';
+        submitBtn.innerText = 'Create Account & Enter';
+        tabLogin.classList.remove('active');
+        tabReg.classList.add('active');
+      }
+    }
+
+    function showAuthAlert(msg, isSuccess = false) {
+      const el = document.getElementById('auth-alert');
+      el.style.display = 'block';
+      el.style.background = isSuccess ? 'rgba(16, 185, 129, 0.2)' : 'rgba(244, 63, 94, 0.2)';
+      el.style.border = isSuccess ? '1px solid rgba(16, 185, 129, 0.4)' : '1px solid rgba(244, 63, 94, 0.4)';
+      el.style.color = isSuccess ? '#34d399' : '#fda4af';
+      el.innerText = msg;
+    }
+
+    function hideAuthAlert() {
+      const el = document.getElementById('auth-alert');
+      if (el) el.style.display = 'none';
+    }
+
+    async function submitAuthModal() {
+      const username = document.getElementById('auth-input-user').value.trim();
+      const password = document.getElementById('auth-input-pass').value;
+      if (!username || !password) {
+        showAuthAlert('Please fill in both username and password.');
+        return;
+      }
+
+      const endpoint = (currentAuthMode === 'login') ? '/api/auth/login' : '/api/auth/register';
+      try {
+        const res = await fetch(endpoint, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ username, password })
+        });
+        const data = await res.json();
+        if (res.ok && data.status === 'success') {
+          showAuthAlert(data.message || 'Authentication successful!', true);
+          localStorage.setItem('arcane_logged_user', username);
+          setTimeout(() => {
+            closeAuthModal();
+            initAuthUI();
+            fetchOverview();
+          }, 600);
+        } else {
+          showAuthAlert(data.message || 'Authentication failed. Please verify credentials.');
+        }
+      } catch (err) {
+        showAuthAlert('Network error: ' + err.message);
+      }
+    }
+
+    function logoutWebUser() {
+      localStorage.removeItem('arcane_logged_user');
+      initAuthUI();
+      const filterEl = document.getElementById('match-user-filter');
+      if (filterEl) filterEl.value = 'all';
+      fetchOverview();
+    }
+
+    function onUserFilterChange() {
+      fetchOverview();
+    }
+
+    // Startup
+    window.addEventListener('DOMContentLoaded', () => {
+      initCharts();
+      initAuthUI();
+      fetchOverview();
+
+      // Poll every 3 seconds
+      setInterval(fetchOverview, 3000);
+    });
+  </script>
+
+  <!-- Player Authentication Modal -->
+  <div id="auth-modal" class="modal-overlay">
+    <div class="modal-card">
+      <button style="position: absolute; top: 1rem; right: 1rem; background: none; border: none; color: var(--text-muted); font-size: 1.5rem; cursor: pointer;" onclick="closeAuthModal()">✕</button>
+      <div style="text-align: center; margin-bottom: 1.5rem;">
+        <h3 id="modal-title" style="font-family: 'Cinzel', serif; font-size: 1.4rem; color: var(--accent-gold); margin-bottom: 0.3rem;">PLAYER LOGIN</h3>
+        <p id="modal-sub" style="font-size: 0.82rem; color: var(--text-muted);">Access and filter personal battle logs & ML playstyles</p>
+      </div>
+      <div style="display: flex; background: rgba(255,255,255,0.05); border-radius: 10px; padding: 3px; margin-bottom: 1.2rem;">
+        <button id="modal-tab-login" class="tab-btn active" style="flex: 1; justify-content: center;" onclick="setModalMode('login')">Login</button>
+        <button id="modal-tab-reg" class="tab-btn" style="flex: 1; justify-content: center;" onclick="setModalMode('register')">Register</button>
+      </div>
+      <div id="auth-alert" style="display: none; padding: 0.6rem 0.9rem; border-radius: 8px; font-size: 0.82rem; margin-bottom: 1rem;"></div>
+      <div style="display: flex; flex-direction: column; gap: 1rem;">
+        <div>
+          <label style="display: block; font-size: 0.8rem; color: var(--text-muted); font-weight: 600; margin-bottom: 0.4rem;">PLAYER USERNAME</label>
+          <input type="text" id="auth-input-user" class="control-input" style="width: 100%; padding: 0.7rem 0.9rem; border-radius: 8px;" placeholder="Hero username...">
+        </div>
+        <div>
+          <label style="display: block; font-size: 0.8rem; color: var(--text-muted); font-weight: 600; margin-bottom: 0.4rem;">SECRET PASSWORD</label>
+          <input type="password" id="auth-input-pass" class="control-input" style="width: 100%; padding: 0.7rem 0.9rem; border-radius: 8px;" placeholder="Enter password (min 4 chars)..." onkeydown="if(event.key==='Enter') submitAuthModal()">
+        </div>
+        <button id="auth-submit-btn" class="btn-fl" style="width: 100%; justify-content: center; margin-top: 0.5rem;" onclick="submitAuthModal()">Login to Observatory</button>
+      </div>
+    </div>
+  </div>
+</body>
+</html>

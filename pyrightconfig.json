@@ -1,0 +1,16 @@
+{
+  "include": [
+    "."
+  ],
+  "pythonPath": "venv/Scripts/python.exe",
+  "venvPath": ".",
+  "venv": "venv",
+  "extraPaths": [
+    ".",
+    "game",
+    "backend",
+    "model",
+    "dashboard",
+    "venv/Lib/site-packages"
+  ]
+}
