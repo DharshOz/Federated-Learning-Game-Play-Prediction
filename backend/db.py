@@ -66,15 +66,24 @@ class Database:
         self._init_connection()
 
     def _init_connection(self):
+        # Guard against unconfigured or placeholder credentials without attempting invalid connections
+        placeholder_tokens = ("<DB_USERNAME>", "<DB_PASSWORD>", "<user>", "<password>")
+        if not MONGODB_URI or any(token in MONGODB_URI for token in placeholder_tokens):
+            self.use_mongo = False
+            print(f"[Database] Notice: MongoDB URI contains unconfigured placeholders (<DB_USERNAME>/<DB_PASSWORD>). Please supply valid MongoDB credentials in root .env to enable Atlas cloud sync. Using resilient Local Storage fallback at {LOCAL_FILE}")
+            self._load_local()
+            return
+
         try:
             from pymongo import MongoClient
-            # 1.5s timeout for cloud Atlas DNS SRV resolution and TLS handshake so local fallback is instant
-            client = MongoClient(MONGODB_URI, serverSelectionTimeoutMS=1500)
+            # 2.0s timeout for cloud Atlas DNS SRV resolution and TLS handshake so local fallback is fast
+            client = MongoClient(MONGODB_URI, serverSelectionTimeoutMS=2000)
             client.admin.command('ping')
             self.client = client
             self.db = client[DB_NAME]
             self.use_mongo = True
-            print(f"[Database] Successfully connected to MongoDB at {MONGODB_URI.split('@')[-1]}")
+            safe_target = MONGODB_URI.split('@')[-1].split('?')[0] if '@' in MONGODB_URI else 'MongoDB'
+            print(f"[Database] Successfully connected to MongoDB Atlas at {safe_target}")
             # Ensure unique index on username
             try:
                 self.db.users.create_index("username", unique=True)
@@ -82,7 +91,9 @@ class Database:
                 pass
         except Exception as e:
             self.use_mongo = False
-            print(f"[Database] MongoDB unavailable ({e}). Using resilient Local Storage fallback at {LOCAL_FILE}")
+            import re
+            err_msg = re.sub(r'://([^:]+):([^@]+)@', r'://\1:***@', str(e))
+            print(f"[Database] MongoDB unavailable ({err_msg}). Using resilient Local Storage fallback at {LOCAL_FILE}")
             self._load_local()
 
     def _load_local(self):
@@ -382,8 +393,10 @@ class Database:
 
     def save_match(self, match_data: dict, commit: bool = True) -> dict:
         summary = match_data.get("summary", {})
-        player_id = summary.get("player_id", "unknown_player")
-        won = (summary.get("outcome") == "win")
+        player_id = summary.get("player_id") or match_data.get("player_id") or "unknown_player"
+        match_id = summary.get("match_id") or match_data.get("match_id")
+        outcome = summary.get("outcome") or match_data.get("outcome")
+        won = (outcome == "win")
         
         pred = match_data.get("prediction") or summary.get("prediction") or {}
         persona = pred.get("persona", "Unknown")
@@ -396,12 +409,12 @@ class Database:
         )
 
         doc = {
-            "match_id": summary.get("match_id"),
+            "match_id": match_id,
             "player_id": player_id,
-            "hero_class": summary.get("hero_class"),
-            "boss_variant": summary.get("boss_variant"),
-            "outcome": summary.get("outcome"),
-            "total_turns": summary.get("total_turns"),
+            "hero_class": summary.get("hero_class") or match_data.get("hero_class"),
+            "boss_variant": summary.get("boss_variant") or match_data.get("boss_variant"),
+            "outcome": outcome,
+            "total_turns": summary.get("total_turns") or match_data.get("total_turns"),
             "prediction": pred,
             "agent_analysis": agent_analysis,
             "summary": summary,
@@ -493,6 +506,7 @@ class Database:
         if self.use_mongo:
             try:
                 self.db.fl_rounds.insert_one(round_data)
+                round_data.pop("_id", None)
                 return
             except Exception as e:
                 print(f"[Database] Mongo fl_round insert error: {e}")

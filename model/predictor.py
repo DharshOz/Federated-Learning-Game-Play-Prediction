@@ -10,6 +10,7 @@ import sys
 import numpy as np
 import torch
 import joblib
+from typing import Any, Optional, Dict, List
 
 def get_project_root() -> str:
     cur = os.path.dirname(os.path.abspath(__file__))
@@ -41,34 +42,43 @@ def _find_file(filename: str) -> str:
             return c
     return candidates[0]
 
-MODEL_PATH  = _find_file("playstyle_classifier.pt")
-SCALER_PATH = _find_file("feature_scaler.joblib")
+MODEL_PATH     = _find_file("fl_global_model.pt") if os.path.exists(_find_file("fl_global_model.pt")) else _find_file("playstyle_classifier.pt")
+SCALER_PATH    = _find_file("feature_scaler.joblib")
+NOTEBOOK_SOURCE = "train_and_predict_playstyle.ipynb"
 
 # Archetype metadata for rich UI and dashboard display
 PERSONA_PROFILES = {
     "Aggressive": {
         "title": "Relentless Berserker",
         "badge_color": (255, 75, 90),
+        "badge_color_hex": "#FF4757",
         "description": "Favors immediate high-damage spells and relentless pressure, delaying healing until critical health.",
-        "icon": "⚔️"
+        "icon": "⚔️",
+        "key_traits": ["High Fireball & Fire Spell usage", "Low heal HP threshold (<20%)", "High damage output", "Low counter-play focus"]
     },
     "Defensive": {
         "title": "Tactical Guardian",
         "badge_color": (46, 213, 115),
+        "badge_color_hex": "#2ED573",
         "description": "Anticipates boss telegraphs with precise soft-counters and maintains high health reserves via proactive recovery.",
-        "icon": "🛡️"
+        "icon": "🛡️",
+        "key_traits": ["High counter-play rate (>60%)", "Frequent Rest & Heal", "High heal trigger HP (>50%)", "Consistent resource buffer"]
     },
     "Optimal": {
         "title": "Grand Strategist",
         "badge_color": (155, 89, 182),
+        "badge_color_hex": "#9B59B6",
         "description": "Methodically balances resource thresholds (XP>80, Power>50) before unleashing high-value bursts and tactical counters.",
-        "icon": "⚡"
+        "icon": "⚡",
+        "key_traits": ["Balanced spell rotation", "High XP/Power management", "Adapts counter-play in phase 2", "Optimal damage-trade ratio"]
     },
     "Random": {
         "title": "Wildcard Sorcerer",
         "badge_color": (255, 165, 2),
+        "badge_color_hex": "#FFA502",
         "description": "Exhibits unpredictable spell variety and high action entropy without adhering to rigid tactical loops.",
-        "icon": "🎲"
+        "icon": "🎲",
+        "key_traits": ["High Shannon action entropy", "Even spread of all actions", "Low repeat rate", "Uncorrelated counter timing"]
     }
 }
 
@@ -76,11 +86,23 @@ class PlaystylePredictor:
     """Singleton/Cached predictor that evaluates completed matches."""
 
     def __init__(self, model_path=None, scaler_path=None):
-        self.model_path = model_path or _find_file("playstyle_classifier.pt")
+        if model_path is None:
+            fl_path = _find_file("fl_global_model.pt")
+            base_path = _find_file("playstyle_classifier.pt")
+            self.model_path = fl_path if os.path.exists(fl_path) else base_path
+        else:
+            self.model_path = model_path
         self.scaler_path = scaler_path or _find_file("feature_scaler.joblib")
         self.model = None
         self.scaler = None
         self.feat_cols = None
+        self._load()
+
+    def reload(self):
+        """Reload the latest global model checkpoint from disk."""
+        fl_path = _find_file("fl_global_model.pt")
+        base_path = _find_file("playstyle_classifier.pt")
+        self.model_path = fl_path if os.path.exists(fl_path) else base_path
         self._load()
 
     def _load(self):
@@ -90,17 +112,32 @@ class PlaystylePredictor:
             
             if os.path.exists(self.model_path):
                 ckpt = torch.load(self.model_path, map_location="cpu")
-                input_dim = ckpt["input_dim"]
-                hidden_dim = ckpt.get("hidden_dim", 32)
-                num_classes = ckpt.get("num_classes", len(PERSONA_LABELS))
-                self.feat_cols = ckpt.get("feat_cols")
+                if isinstance(ckpt, dict) and "model_state_dict" in ckpt:
+                    state_dict = ckpt["model_state_dict"]
+                    input_dim = ckpt.get("input_dim", 49)
+                    hidden_dim = ckpt.get("hidden_dim", 32)
+                    num_classes = ckpt.get("num_classes", len(PERSONA_LABELS))
+                    self.feat_cols = ckpt.get("feat_cols")
+                else:
+                    state_dict = ckpt
+                    input_dim = state_dict["net.0.weight"].shape[1] if "net.0.weight" in state_dict else 49
+                    hidden_dim = state_dict["net.0.weight"].shape[0] if "net.0.weight" in state_dict else 32
+                    num_classes = state_dict["net.5.weight"].shape[0] if "net.5.weight" in state_dict else len(PERSONA_LABELS)
+
+                if not self.feat_cols:
+                    try:
+                        base_ckpt = torch.load(_find_file("playstyle_classifier.pt"), map_location="cpu")
+                        if isinstance(base_ckpt, dict):
+                            self.feat_cols = base_ckpt.get("feat_cols")
+                    except Exception:
+                        pass
                 
                 self.model = PlaystyleClassifier(
                     input_dim=input_dim,
                     hidden_dim=hidden_dim,
                     num_classes=num_classes
                 )
-                self.model.load_state_dict(ckpt["model_state_dict"])
+                self.model.load_state_dict(state_dict)
                 self.model.eval()
         except Exception as e:
             print(f"[Predictor] Warning: could not load model or scaler: {e}")
@@ -211,6 +248,87 @@ class PlaystylePredictor:
             }
         }
 
+    def predict_fighting_style(
+        self,
+        actions_or_match: Any = None,
+        aggression_level: Optional[float] = None,
+        counter_play_rate: Optional[float] = None,
+        heal_hp_threshold: Optional[float] = None,
+        decision_speed_ms: Optional[float] = None,
+    ) -> dict:
+        """
+        Interactive fighting style prediction conforming directly to Section 9 of
+        train_and_predict_playstyle.ipynb.
+        """
+        import random
+        # 1. If actions_or_match is a full match dictionary
+        if isinstance(actions_or_match, dict) and "turns" in actions_or_match:
+            match_dict = actions_or_match
+        # 2. If actions_or_match is a list of action names
+        elif isinstance(actions_or_match, list) and len(actions_or_match) > 0:
+            turns = []
+            hero_hp = 110
+            power = 50
+            for i, act in enumerate(actions_or_match, 1):
+                rt = decision_speed_ms if decision_speed_ms is not None else random.randint(1000, 2000)
+                turns.append({
+                    "turn_number": i,
+                    "action_chosen": act,
+                    "player_hp_before": hero_hp,
+                    "player_power_before": power,
+                    "player_xp_before": 50,
+                    "damage_dealt": 25 if "Fire" in act else 14,
+                    "damage_taken": 12,
+                    "hit_success": True,
+                    "action_matched_counter": (counter_play_rate is not None and random.random() < counter_play_rate),
+                    "time_taken_to_decide": rt
+                })
+                if "Heal" in act: hero_hp = min(110, hero_hp + 30)
+                elif "Rest" in act: power = min(100, power + 35)
+            match_dict = {"summary": {"hero_class": "Wanderer Magician", "outcome": "win"}, "turns": turns}
+        else:
+            # 3. Build synthetic profile from high-level tactical traits
+            agg = float(aggression_level if aggression_level is not None else 0.5)
+            c_rate = float(counter_play_rate if counter_play_rate is not None else 0.4)
+            h_thresh = float(heal_hp_threshold if heal_hp_threshold is not None else 0.35)
+            speed = float(decision_speed_ms if decision_speed_ms is not None else 1500.0)
+
+            turns = []
+            for turn_no in range(1, 15):
+                r = random.random()
+                if r < agg * 0.6:
+                    act = random.choice(["Fireball", "Fire Spell"])
+                elif r < agg * 0.8:
+                    act = "Quick Slash"
+                elif random.random() < c_rate:
+                    act = "Water Arrow"
+                elif random.random() < 0.2:
+                    act = "Rest & Recharge"
+                else:
+                    act = "Heal"
+
+                turns.append({
+                    "turn_number": turn_no,
+                    "action_chosen": act,
+                    "player_hp_before": 110 * (h_thresh if act == "Heal" else 0.8),
+                    "player_power_before": 60 if agg < 0.6 else 20,
+                    "player_xp_before": 60,
+                    "damage_dealt": 25 if "Fire" in act else 12,
+                    "damage_taken": 10 if random.random() < c_rate else 22,
+                    "hit_success": True,
+                    "action_matched_counter": (random.random() < c_rate),
+                    "time_taken_to_decide": speed + random.randint(-150, 150)
+                })
+            match_dict = {"summary": {"hero_class": "Wanderer Magician", "outcome": "win"}, "turns": turns}
+
+        res = self.predict(match_dict)
+        res["model_source"] = NOTEBOOK_SOURCE
+        res["global_architecture"] = "PlaystyleClassifier (MLP 49->32->32->4)"
+        profile = PERSONA_PROFILES.get(res["persona"], PERSONA_PROFILES["Aggressive"])
+        res["badge_color_hex"] = profile.get("badge_color_hex", "#a855f7")
+        res["key_traits"] = profile.get("key_traits", [])
+        return res
+
 _GLOBAL_PREDICTOR = None
 
 def get_predictor() -> PlaystylePredictor:
@@ -222,3 +340,7 @@ def get_predictor() -> PlaystylePredictor:
 def predict_match(match_data: dict) -> dict:
     """Direct helper to predict playstyle for a match dictionary."""
     return get_predictor().predict(match_data)
+
+def predict_fighting_style(**kwargs) -> dict:
+    """Interactive fighting style prediction conforming directly to Section 9 of the notebook."""
+    return get_predictor().predict_fighting_style(**kwargs)

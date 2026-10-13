@@ -306,7 +306,16 @@ class BattleLogger:
             print(f"[BattleLogger] Prediction error: {e}")
             self.last_prediction = None
 
-        # ── Run Groq Agent Deep Analysis (async thread to not block game) ───
+        # ── Run Strategic AI Agent Analysis (synchronous baseline + async LLM enhancement) ───
+        try:
+            from backend.playstyle_agent import analyse_match
+            self.last_agent_analysis = analyse_match(match_payload, self.last_prediction)
+            match_payload["agent_analysis"] = self.last_agent_analysis
+            summary["agent_analysis"] = self.last_agent_analysis
+        except Exception as e:
+            print(f"[BattleLogger] Agent analysis init notice: {e}")
+            self.last_agent_analysis = None
+
         def _run_agent():
             try:
                 from backend.playstyle_agent import analyse_match
@@ -316,10 +325,9 @@ class BattleLogger:
                 summary["agent_analysis"] = agent_result
                 # Re-save to disk with agent data included
                 self._save_to_disk(match_payload)
-                print(f"[BattleLogger] Agent analysis complete: {agent_result.get('playstyle_label','?')} ({agent_result.get('playstyle_confidence','?')})")
+                print(f"[BattleLogger] Strategic Agent analysis updated: {agent_result.get('playstyle_label','?')} ({agent_result.get('playstyle_confidence','?')})")
             except Exception as e:
-                print(f"[BattleLogger] Agent analysis error: {e}")
-                self.last_agent_analysis = None
+                print(f"[BattleLogger] Strategic Agent update note: {e}")
 
         import threading
         t = threading.Thread(target=_run_agent, daemon=True, name="AgentAnalysisThread")

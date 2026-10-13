@@ -27,6 +27,12 @@ if BASE not in sys.path:
     sys.path.insert(0, BASE)
 
 try:
+    from dotenv import load_dotenv
+    load_dotenv(os.path.join(BASE, ".env"))
+except Exception:
+    pass
+
+try:
     from .entity import Entity
     from .ui import UI, C_WHITE, C_RED, C_GOLD, C_GREEN, C_ACCENT, C_BLUE, C_LIGHT_GRAY, glow_surface
     from .animation import AnimatedSprite, EffectAnimation, load_sequence, load_spritesheet_row
@@ -48,6 +54,15 @@ try:
 except Exception:
     ensure_server_running = lambda: None
     open_dashboard = lambda: None
+
+# Boss Round (post-round-1 gauntlet with 3D-character-inspired bosses)
+try:
+    from .boss_round import launch_boss_round
+except (ImportError, ValueError):
+    try:
+        from boss_round import launch_boss_round
+    except ImportError:
+        launch_boss_round = None
 
 try:
     from backend.client_sync import get_client_sync
@@ -240,6 +255,7 @@ STATE_MENU        = "menu"
 STATE_SELECT      = "select"
 STATE_COMBAT      = "combat"
 STATE_GAMEOVER    = "gameover"
+STATE_BOSS_ROUND  = "boss_round"    # Post-round-1 boss gauntlet
 
 PHASE_HERO_TURN   = "hero_turn"
 PHASE_HERO_ANIM   = "hero_anim"
@@ -298,6 +314,7 @@ class Game:
         self.ui        = UI(self.screen, self.fonts)
         self.backgrounds = load_backgrounds()
         self.effects_lib = load_effects()
+        self.effects     = self.effects_lib
 
         # Selection state
         self.selected_hero_idx = 0
@@ -353,6 +370,7 @@ class Game:
         self.phase2_boss_turns_count = 0
         self.last_phase_transition_occurred = False
         self._dashboard_opened_for_match = False
+        self._boss_round_triggered = False   # True once boss round fires per match
 
         # Automatically start backend observatory server in background
         try:
@@ -475,6 +493,7 @@ class Game:
         self.quick_slash_streak = 0
         self.adaptive_memory.reset()
         self._dashboard_opened_for_match = False
+        self._boss_round_triggered = False
 
         self.boss_telegraphed_act, self.boss_actual_act, self.boss_is_feint, self.latest_adaptive_weights = (
             self.villain.plan_next_attack(adaptive_memory=self.adaptive_memory)
@@ -537,6 +556,8 @@ class Game:
             elif self.state == STATE_COMBAT:
                 self._handle_combat(events, mouse, now)
                 self._draw_combat(mouse, now)
+            elif self.state == STATE_BOSS_ROUND:
+                self._run_boss_round()
             elif self.state == STATE_GAMEOVER:
                 self._handle_gameover(events, mouse)
                 self._draw_gameover(mouse)
@@ -1373,7 +1394,6 @@ class Game:
     def _end_game(self, won):
         self.won = won
         self.phase = PHASE_RESULT          # keep drawing last frame
-        self._gameover_at = pygame.time.get_ticks() + 1800  # timestamp-based
         self.logger.end_match(won, self.hero.hp if self.hero else 0)
         # Ensure server is running and auto-open dashboard upon match completion
         try:
@@ -1383,6 +1403,38 @@ class Game:
                 open_dashboard()
         except Exception as e:
             print(f"[Game] Dashboard auto-open notice: {e}")
+
+        # If player won round 1, queue the Boss Round instead of going directly to gameover
+        if won and not getattr(self, "_boss_round_triggered", False) and launch_boss_round is not None:
+            self._boss_round_triggered = True
+            # Small delay then enter boss round state (skip normal gameover timer)
+            self._gameover_at = 0            # no auto-gameover
+            self.state = STATE_BOSS_ROUND    # handled in run loop
+        else:
+            self._gameover_at = pygame.time.get_ticks() + 1800
+
+    def _run_boss_round(self):
+        """Run the post-round-1 Boss Round gauntlet."""
+        if launch_boss_round is None:
+            self.state = STATE_GAMEOVER
+            return
+
+        boss_won = launch_boss_round(
+            screen=self.screen,
+            clock=self.clock,
+            fonts=self.fonts,
+            backgrounds=self.backgrounds,
+            hero=self.hero,
+            hero_sprite=self.hero_sprite,
+            effects_lib=getattr(self, "effects_lib", getattr(self, "effects", {})),
+            predicted_style=getattr(self, "agent_predicted_playstyle", None)
+            or getattr(self.logger, "predicted_playstyle", None)
+            or getattr(self, "predicted_playstyle", None),
+        )
+        self.won = boss_won
+        self.phase = PHASE_RESULT
+        self._gameover_at = 0
+        self.state = STATE_GAMEOVER
 
     # ═══════════════════════════════════════════════════════════════════════════
     #  COMBAT SCREEN — DRAWING
@@ -1473,15 +1525,18 @@ class Game:
     # ═══════════════════════════════════════════════════════════════════════════
 
     def _handle_gameover(self, events, mouse):
-        btn_y = (H // 2 - 165) + 310 + 20
-        btn_w, btn_h = 200, 50
-        gap = 18
-        total_w = btn_w * 3 + gap * 2
-        start_x = W // 2 - total_w // 2
-
-        retry_r = pygame.Rect(start_x, btn_y, btn_w, btn_h)
-        dash_r  = pygame.Rect(start_x + btn_w + gap, btn_y, btn_w, btn_h)
-        menu_r  = pygame.Rect(start_x + (btn_w + gap) * 2, btn_y, btn_w, btn_h)
+        rects = getattr(self.ui, "endscreen_button_rects", None)
+        if rects:
+            retry_r, dash_r, menu_r = rects
+        else:
+            btn_y = 125 + 440 + 15
+            btn_w, btn_h = 220, 48
+            gap = 20
+            total_w = btn_w * 3 + gap * 2
+            start_x = W // 2 - total_w // 2
+            retry_r = pygame.Rect(start_x, btn_y, btn_w, btn_h)
+            dash_r  = pygame.Rect(start_x + btn_w + gap, btn_y, btn_w, btn_h)
+            menu_r  = pygame.Rect(start_x + (btn_w + gap) * 2, btn_y, btn_w, btn_h)
 
         for e in events:
             if e.type == pygame.MOUSEBUTTONDOWN and e.button == 1:

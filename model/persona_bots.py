@@ -26,9 +26,12 @@ import argparse
 from datetime import datetime
 from typing import List, Dict, Any, Optional, Tuple
 
-# Add project root to path so we can import entity and adaptive_weighting
+# Add project root and game directory to path so we can import entity and adaptive_weighting
 _BASE_DIR = os.path.dirname(os.path.abspath(__file__))
-sys.path.insert(0, _BASE_DIR)
+_ROOT_DIR = os.path.abspath(os.path.join(_BASE_DIR, ".."))
+if _ROOT_DIR not in sys.path:
+    sys.path.insert(0, _ROOT_DIR)
+sys.path.insert(0, os.path.join(_ROOT_DIR, "game"))
 
 from entity import Entity
 from adaptive_weighting import AdaptiveBossMemory
@@ -58,7 +61,7 @@ _EXPECTED_DAMAGE = {k: Entity.ATTACKS[k]["base_dmg"] * Entity.ATTACKS[k]["hit_ch
                     for k in PLAYER_ACTIONS}
 
 # Logs directory
-LOGS_DIR = os.path.join(_BASE_DIR, "logs")
+LOGS_DIR = os.path.join(_ROOT_DIR, "logs")
 
 # Counter-play soft rules (mirrors game.py _evaluate_counter_play)
 _HEAVY_ATTACKS = {"fireball", "fire_spell", "water_spell"}
